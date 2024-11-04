@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:io' show Platform;
+import 'dart:io' if (dart.library.html) 'dart:html';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
@@ -169,7 +169,12 @@ class SniCheckerHomePageState extends State<SniCheckerHomePage> {
   void _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['txt']);
     if (result != null) {
-      String content = await File(result.files.single.path!).readAsString();
+      String content;
+      if (kIsWeb) {
+        content = String.fromCharCodes(result.files.single.bytes!);
+      } else {
+        content = await File(result.files.single.path!).readAsString();
+      }
       setState(() {
         _controller.text = content;
       });
