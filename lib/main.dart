@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:io';
+import 'dart:io' show Platform;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await DatabaseHelper.instance.initializeDatabase();
+  if (!kIsWeb) {
+    await DatabaseHelper.instance.initializeDatabase();
+  }
   runApp(const SniCheckerApp());
 }
 
@@ -29,6 +32,7 @@ class SniCheckerAppState extends State<SniCheckerApp> {
   }
 
   void _loadThemeSetting() async {
+    if (kIsWeb) return;
     int? themeSetting = await DatabaseHelper.instance.getThemeSetting();
     if (themeSetting != null) {
       setState(() {
@@ -49,7 +53,9 @@ class SniCheckerAppState extends State<SniCheckerApp> {
   void _toggleTheme() {
     setState(() {
       _isDarkTheme = !_isDarkTheme;
-      DatabaseHelper.instance.insertThemeSetting(_isDarkTheme ? 1 : 0);
+      if (!kIsWeb) {
+        DatabaseHelper.instance.insertThemeSetting(_isDarkTheme ? 1 : 0);
+      }
     });
   }
 }
@@ -81,6 +87,7 @@ class SniCheckerHomePageState extends State<SniCheckerHomePage> {
   }
 
   void _loadPreviousHosts() async {
+    if (kIsWeb) return;
     String? previousHosts = await DatabaseHelper.instance.getPreviousHosts();
     if (previousHosts != null) {
       setState(() {
@@ -91,7 +98,6 @@ class SniCheckerHomePageState extends State<SniCheckerHomePage> {
 
   void _checkSniForHosts() async {
     if (_isChecking) {
-      // Interrupt the current checking process
       setState(() {
         _isChecking = false;
         _isLoading = false;
@@ -99,7 +105,9 @@ class SniCheckerHomePageState extends State<SniCheckerHomePage> {
       return;
     }
 
-    await DatabaseHelper.instance.insertHosts(_controller.text);
+    if (!kIsWeb) {
+      await DatabaseHelper.instance.insertHosts(_controller.text);
+    }
     setState(() {
       _isLoading = true;
       _isChecking = true;
@@ -154,7 +162,6 @@ class SniCheckerHomePageState extends State<SniCheckerHomePage> {
       final response = await http.get(url).timeout(Duration(seconds: timeout));
       return response.statusCode == 200;
     } catch (e) {
-      // TODO: Replace with proper logging solution
       return false;
     }
   }
@@ -162,8 +169,7 @@ class SniCheckerHomePageState extends State<SniCheckerHomePage> {
   void _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['txt']);
     if (result != null) {
-      File file = File(result.files.single.path!);
-      String content = await file.readAsString();
+      String content = await File(result.files.single.path!).readAsString();
       setState(() {
         _controller.text = content;
       });
@@ -171,7 +177,9 @@ class SniCheckerHomePageState extends State<SniCheckerHomePage> {
   }
 
   void _clearAll() async {
-    await DatabaseHelper.instance.clearDatabase();
+    if (!kIsWeb) {
+      await DatabaseHelper.instance.clearDatabase();
+    }
     setState(() {
       _controller.clear();
       _hosts.clear();
@@ -323,6 +331,7 @@ class DatabaseHelper {
   Future<Database> get database async => _database ??= await _initDatabase();
 
   Future<void> initializeDatabase() async {
+    if (kIsWeb) return;
     _database = await _initDatabase();
   }
 
@@ -340,6 +349,7 @@ class DatabaseHelper {
   }
 
   Future<void> insertHosts(String hosts) async {
+    if (kIsWeb) return;
     Database db = await instance.database;
     await db.insert(
       'settings',
@@ -349,6 +359,7 @@ class DatabaseHelper {
   }
 
   Future<String?> getPreviousHosts() async {
+    if (kIsWeb) return null;
     Database db = await instance.database;
     List<Map<String, dynamic>> result = await db.query('settings', where: 'id = ?', whereArgs: [1]);
     if (result.isNotEmpty) {
@@ -358,6 +369,7 @@ class DatabaseHelper {
   }
 
   Future<int?> getThemeSetting() async {
+    if (kIsWeb) return null;
     Database db = await instance.database;
     List<Map<String, dynamic>> result = await db.query('settings', columns: ['theme'], where: 'id = ?', whereArgs: [1]);
     if (result.isNotEmpty) {
@@ -367,6 +379,7 @@ class DatabaseHelper {
   }
 
   Future<void> insertThemeSetting(int theme) async {
+    if (kIsWeb) return;
     Database db = await instance.database;
     await db.insert(
       'settings',
@@ -376,6 +389,7 @@ class DatabaseHelper {
   }
 
   Future<void> clearDatabase() async {
+    if (kIsWeb) return;
     Database db = await instance.database;
     await db.delete('settings');
   }
