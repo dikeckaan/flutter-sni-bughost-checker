@@ -5,6 +5,7 @@ on:
     # Allows manual triggering of the workflow
 
 jobs:
+  # Job for deploying to GitHub Pages
   build:
     runs-on: ubuntu-latest
 
@@ -43,3 +44,26 @@ jobs:
           git push -u origin gh-pages --force
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
+
+  # Job for updating the version
+  update-version:
+    if: >
+      github.event.review.state == 'approved' &&
+      github.event.pull_request.state == 'open'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Update version
+        run: |
+          # Command to update version information, adjust as needed
+          echo "Version updated after approval"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add version.json
+          git commit -m "Update version after approval"
+          git push
