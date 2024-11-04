@@ -41,4 +41,4 @@ jobs:
           git commit -m "Deploy to GitHub Pages"
           git push -u origin gh-pages --force
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
