@@ -39,6 +39,7 @@ jobs:
           cp -r build/web/* .
           git add .
           git commit -m "Deploy to GitHub Pages"
+          git remote set-url origin https://$GH_PAT@github.com/dikeckaan/flutter-sni-bughost-checker.git
           git push -u origin gh-pages --force
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GH_PAT: ${{ secrets.GH_PAT }}
