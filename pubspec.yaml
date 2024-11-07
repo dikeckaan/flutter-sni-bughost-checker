@@ -16,6 +16,7 @@ dependencies:
   path: ^1.8.0
   win32: ^2.0.0
   sqflite_common_ffi: ^2.0.0+1
+  file_picker_web: ^2.0.0 # veya uygun versiyon
 
   cupertino_icons: ^1.0.6
 
