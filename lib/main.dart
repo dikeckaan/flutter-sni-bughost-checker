@@ -1,30 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() {
   runApp(const SniCheckerApp());
 }
 
-class SniCheckerApp extends StatelessWidget {
+class SniCheckerApp extends StatefulWidget {
   const SniCheckerApp({super.key});
+
+  @override
+  SniCheckerAppState createState() => SniCheckerAppState();
+}
+
+class SniCheckerAppState extends State<SniCheckerApp> {
+  bool _isDarkTheme = true;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SNI Checker',
-      theme: ThemeData.light(),
-      darkTheme: ThemeData.dark(),
-      themeMode: ThemeMode.system,
-      home: const SniCheckerHomePage(),
+      theme: _isDarkTheme ? ThemeData.dark() : ThemeData.light(),
+      home: SniCheckerHomePage(toggleTheme: _toggleTheme),
     );
+  }
+
+  void _toggleTheme() {
+    setState(() {
+      _isDarkTheme = !_isDarkTheme;
+    });
   }
 }
 
 class SniCheckerHomePage extends StatefulWidget {
-  const SniCheckerHomePage({super.key});
+  final VoidCallback toggleTheme;
+
+  const SniCheckerHomePage({super.key, required this.toggleTheme});
 
   @override
   SniCheckerHomePageState createState() => SniCheckerHomePageState();
@@ -41,6 +54,104 @@ class SniCheckerHomePageState extends State<SniCheckerHomePage> {
   bool _isLoading = false;
   bool _isChecking = false;
 
+  void _checkSniForHosts() async {
+    if (_isChecking) {
+      setState(() {
+        _isChecking = false;
+        _isLoading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _isChecking = true;
+      _successHosts.clear();
+      _successCount = 0;
+      _failCount = 0;
+      _hosts.clear();
+    });
+
+    List<String> hosts = _controller.text.split('\n');
+    int timeout = int.tryParse(_timeoutController.text) ?? 10;
+    int parallelChecks = int.tryParse(_parallelChecksController.text) ?? 3;
+
+    List<Future<void>> futures = [];
+    for (String host in hosts) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!_isChecking) break;
+
+      host = host.trim();
+      if (host.isNotEmpty) {
+        futures.add(_checkSni(host, timeout).then((result) {
+          if (!_isChecking) return;
+          setState(() {
+            if (result) {
+              _successHosts.add(host);
+              _successCount++;
+            } else {
+              _failCount++;
+            }
+            _hosts.add('$host - ${result ? "Success" : "Fail"}');
+          });
+        }));
+
+        if (futures.length >= parallelChecks) {
+          await Future.wait(futures);
+          futures.clear();
+        }
+      }
+    }
+
+    await Future.wait(futures);
+
+    setState(() {
+      _isLoading = false;
+      _isChecking = false;
+    });
+  }
+
+  Future<bool> _checkSni(String hostname, int timeout) async {
+    try {
+      final url = Uri.https(hostname, '');
+      final response = await http.get(url).timeout(Duration(seconds: timeout));
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  void _pickFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['txt']);
+    if (result != null) {
+      File file = File(result.files.single.path!);
+      String content = await file.readAsString();
+      setState(() {
+        _controller.text = content;
+      });
+    }
+  }
+
+  void _clearAll() {
+    setState(() {
+      _controller.clear();
+      _hosts.clear();
+      _successHosts.clear();
+      _successCount = 0;
+      _failCount = 0;
+    });
+  }
+
+  void _copyToClipboard() {
+    if (_successHosts.isNotEmpty) {
+      String content = _successHosts.join('\n');
+      Clipboard.setData(ClipboardData(text: content));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Success hosts copied to clipboard')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,6 +161,10 @@ class SniCheckerHomePageState extends State<SniCheckerHomePage> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _clearAll,
+          ),
+          IconButton(
+            icon: Icon(_isDarkTheme(context) ? Icons.dark_mode : Icons.light_mode),
+            onPressed: widget.toggleTheme,
           ),
         ],
       ),
@@ -155,100 +270,7 @@ class SniCheckerHomePageState extends State<SniCheckerHomePage> {
     );
   }
 
-  void _checkSniForHosts() async {
-    if (_isChecking) {
-      setState(() {
-        _isChecking = false;
-        _isLoading = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _isChecking = true;
-      _successHosts.clear();
-      _successCount = 0;
-      _failCount = 0;
-      _hosts.clear();
-    });
-
-    List<String> hosts = _controller.text.split('\n');
-    int timeout = int.tryParse(_timeoutController.text) ?? 10;
-    int parallelChecks = int.tryParse(_parallelChecksController.text) ?? 3;
-
-    List<Future<void>> futures = [];
-    for (String host in hosts) {
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (!_isChecking) break;
-
-      host = host.trim();
-      if (host.isNotEmpty) {
-        futures.add(_checkSni(host, timeout).then((result) {
-          if (!_isChecking) return;
-          setState(() {
-            if (result) {
-              _successHosts.add(host);
-              _successCount++;
-            } else {
-              _failCount++;
-            }
-            _hosts.add('$host - ${result ? "Success" : "Fail"}');
-          });
-        }));
-
-        if (futures.length >= parallelChecks) {
-          await Future.wait(futures);
-          futures.clear();
-        }
-      }
-    }
-
-    await Future.wait(futures);
-
-    setState(() {
-      _isLoading = false;
-      _isChecking = false;
-    });
-  }
-
-  Future<bool> _checkSni(String hostname, int timeout) async {
-    try {
-      final url = Uri.https(hostname, '');
-      final response = await http.get(url).timeout(Duration(seconds: timeout));
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  void _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['txt']);
-    if (result != null) {
-      String content = String.fromCharCodes(result.files.single.bytes!);
-      setState(() {
-        _controller.text = content;
-      });
-    }
-  }
-
-  void _clearAll() {
-    setState(() {
-      _controller.clear();
-      _hosts.clear();
-      _successHosts.clear();
-      _successCount = 0;
-      _failCount = 0;
-    });
-  }
-
-  void _copyToClipboard() {
-    if (_successHosts.isNotEmpty) {
-      String content = _successHosts.join('\n');
-      Clipboard.setData(ClipboardData(text: content));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Success hosts copied to clipboard')),
-      );
-    }
+  bool _isDarkTheme(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark;
   }
 }
