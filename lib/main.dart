@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:io';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
+import 'dart:io' if (dart.library.html) 'dart:html';
+import 'package:file_picker/file_picker.dart' if (dart.library.html) 'package:file_picker_web/file_picker_web.dart';
 
 void main() {
   runApp(const SniCheckerApp());
@@ -122,13 +122,24 @@ class SniCheckerHomePageState extends State<SniCheckerHomePage> {
   }
 
   void _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['txt']);
-    if (result != null) {
-      File file = File(result.files.single.path!);
-      String content = await file.readAsString();
-      setState(() {
-        _controller.text = content;
-      });
+    if (Platform.isAndroid || Platform.isIOS || Platform.isLinux || Platform.isMacOS || Platform.isWindows) {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['txt']);
+      if (result != null) {
+        File file = File(result.files.single.path!);
+        String content = await file.readAsString();
+        setState(() {
+          _controller.text = content;
+        });
+      }
+    } else {
+      // Web file picker
+      FilePickerResult? result = await FilePickerWeb.platform.pickFiles(allowedExtensions: ['txt']);
+      if (result != null) {
+        String content = await result.files.first.readAsString();
+        setState(() {
+          _controller.text = content;
+        });
+      }
     }
   }
 
