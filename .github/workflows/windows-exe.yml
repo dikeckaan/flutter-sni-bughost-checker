@@ -41,7 +41,7 @@ jobs:
 
       # Upload all files in the Release directory including data folder and DLL
       - name: Upload release files
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: release-files
           path: build/windows/x64/runner/Release
